@@ -1,0 +1,335 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include "HTTPSRedirect.h"
+//-----------------------------------------------------------
+const char *GScriptId = "AKfycbwpxeYy699qT8sLHxCn7MGob8a71oJRNKjGYGzXuA3SGK7dXiCHXQTfr29gj47cWgrw_Q";
+
+String payload_base =  "{\"command\": \"insert_row\", \"sheet_name\": \"Sheet1\", \"values\": ";
+String payload = "";
+
+const char* host = "script.google.com";
+const int httpsPort = 443;
+const char* fingerprint = "";
+String url = String("/macros/s/") + GScriptId + "/exec";
+HTTPSRedirect* client = nullptr;
+
+//Strings
+String value0 = "";
+String value1 = "";
+String value2 = "";
+String value3 = "";
+String value4 = "";
+String value5 = "";
+String value6 = "";
+String value7 = "";
+String value8 = "";
+String value9 = "";
+String value10 = "";
+String value11 = "";
+String value12 = "";
+String value13 = "";
+//-----------------------------------------------------------
+#define WIFI_SSID "FGPIS MALE SECTION 3 - 2.4G"
+#define WIFI_PASSWORD "FGPIS@16Realize"
+//-----------------------------------------------------------
+int blocks[] = {4,5,6,8,9,10,12,13,14,18,20,21,22};
+#define blocks_len  (sizeof(blocks) / sizeof(blocks[0]))
+//-----------------------------------------------------------
+//GPIO 0 --> D3
+//GPIO 2 --> D4
+//GPIO 4 --> D2
+#define RST_PIN  D3
+#define SS_PIN   D4
+#define BUZZER   D0
+#define GreenLed D1 //When WIFI is connected, LED ON.
+#define YellowLed D8 // When CARD is scanned, LED ON.
+#define RedLed D2 //When NODEMCU is not connected to WIFI, LED ON
+//-----------------------------------------
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+MFRC522::MIFARE_Key key;
+MFRC522::StatusCode status;      
+//-----------------------------------------
+/* Be aware of Sector Trailer Blocks */
+int blockNum = 2;  
+/* Create another array to read data from Block */
+/* Legthn of buffer should be 2 Bytes more than the size of Block (16 Bytes) */
+byte bufferLen = 18;
+byte readBlockData[18];
+//-----------------------------------------
+
+
+
+/****************************************************************************************************
+ * setup() function
+ ****************************************************************************************************/
+void setup()
+{
+  Serial.begin(9600);
+  WiFi.mode(WIFI_OFF);        //Prevents reconnection issue (taking too long to connect)
+  delay(1000);
+  WiFi.mode(WIFI_STA);        //This line hides the viewing of ESP as wifi hotspot
+  
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);     //Connect to your WiFi router
+  Serial.println("");
+
+  Serial.print("Connecting to ");
+  Serial.print(WIFI_SSID);
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  //If connection successful show IP address in serial monitor
+  Serial.println("");
+  Serial.println("Connected");
+  digitalWrite(GreenLed, HIGH);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());  //IP address assigned to your ESP
+
+//HTTPSRedirect class
+client = new HTTPSRedirect(httpsPort);
+client->setInsecure();
+client->setPrintResponseBody(true);
+client->setContentTypeHeader("application/json");
+
+Serial.print("Connecting to");
+Serial.println(host);
+
+// Attempt reconnection for a maximum of 5 times
+ bool flag = false;
+  for (int i=0; i<5; i++){ 
+    int retval = client->connect(host, httpsPort);
+    if (retval == 1){
+       flag = true;
+       Serial.println("Connected");
+       break;
+    }
+    else
+      Serial.println("Connection failed. Retrying...");
+}
+if (!flag){
+    Serial.print("Could not connect to server: ");
+     Serial.println(host);
+    return;
+}
+delete client;
+client = nullptr;
+
+ //--------------------------------------------------
+  /* pin outputs */
+  pinMode(BUZZER, OUTPUT);
+  pinMode(GreenLed, OUTPUT);
+  pinMode(YellowLed, OUTPUT);
+  pinMode(RedLed, OUTPUT);
+  //--------------------------------------------------
+  /* Initialize SPI bus */
+  SPI.begin();
+  //--------------------------------------------------
+}
+
+/****************************************************************************************************
+ * loop() function
+ ****************************************************************************************************/
+ void loop()
+{
+  if(WiFi.status() != WL_CONNECTED){
+    WiFi.disconnect();
+    WiFi.mode(WIFI_STA);
+    Serial.print("Reconnecting to ");
+    digitalWrite(RedLed, HIGH);
+    digitalWrite(GreenLed,LOW);
+    Serial.println(WIFI_SSID);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+    Serial.println("");
+    Serial.println("Connected");
+    digitalWrite(RedLed, LOW);
+    digitalWrite(GreenLed, HIGH);
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());  //IP address assigned to your ESP
+  }
+  //------------------------------------------------------------------------
+  /* Initialize MFRC522 Module */
+  mfrc522.PCD_Init();
+  /* Look for new cards */
+  /* Reset the loop if no new card is present on RC522 Reader */
+  if ( ! mfrc522.PICC_IsNewCardPresent()) {return;}
+  /* Select one of the cards */
+  if ( ! mfrc522.PICC_ReadCardSerial()) {return;}
+  /* Read data from the same block */
+  Serial.println();
+  Serial.println(F("Reading last data from RFID..."));  
+  //------------------------------------------------------------------------
+   String fullURL = "", temp;
+  for (byte i = 0; i < 13; i++) {
+    ReadDataFromBlock(blocks[i], readBlockData);
+    if(i == 0){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value0 = temp;
+    }
+    else if (i == 1){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value1 = temp;
+    }
+    else if (i == 2){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value2 = temp;
+    }
+    else if (i == 3){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value3 = temp;
+    }
+    else if (i == 4){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value4 = temp;
+    }
+    else if (i == 5){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value5 = temp;
+    }
+    else if (i == 6){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value6 = temp;
+    }
+    else if (i == 7){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value7 = temp;
+    }
+    else if (i == 8){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value8 = temp;
+    }
+    else if (i == 9){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value9 = temp;
+    }
+    else if (i == 10){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value10 = temp;
+    }
+    else if (i == 11){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value11 = temp;
+    }
+    else if (i == 12){
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value12 = temp;
+    }
+    else{
+      temp = String((char*)readBlockData);
+      //temp.trim();
+      value13 = temp;
+    }
+  }
+  
+  //Serial.println(fullURL);
+  fullURL.trim();
+  Serial.println(fullURL);
+  //------------------------------------------------------------------------
+digitalWrite(BUZZER, HIGH);
+digitalWrite(YellowLed,HIGH);
+      delay(100);
+      digitalWrite(BUZZER, LOW);
+      delay(100);
+      digitalWrite(BUZZER, HIGH);
+      delay(100);
+      digitalWrite(BUZZER, LOW);
+      delay(100);
+      digitalWrite(BUZZER, HIGH);
+      delay(100);
+      digitalWrite(BUZZER, LOW);
+      delay(100);
+      digitalWrite(YellowLed, LOW);
+  //------------------------------------------------------------------------
+//MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+static bool flag = false;
+if (!flag){
+    client = new HTTPSRedirect(httpsPort);
+    client->setInsecure();
+    flag = true;
+    client->setPrintResponseBody(true);
+    client->setContentTypeHeader("application/json");
+}
+if (client != nullptr){
+    if (!client->connected()){
+        client->connect(host, httpsPort);
+    }
+}
+else{
+     Serial.println("Error creating client object");
+}
+
+payload = payload_base +"\""+ value0 + ","+ value1 + ","+ value2 + ","+ value3 + ","+ value4 + ","+ value5 + ","+ value6 + ","+ value7 + ","+ value8 + ","+ value9 + ","+ value10 + ","+ value11 + ","+ value12 + "," +  value13 + "," + "\"}";
+
+Serial.println("Publishing data....");
+Serial.println(payload);
+if(client->POST(url, host, payload)){
+
+}
+ else{
+    // do stuff here if publish was not successful
+    Serial.println("Error while connecting");
+  
+  }
+}
+
+/****************************************************************************************************
+ * ReadDataFromBlock() function
+ ****************************************************************************************************/
+void ReadDataFromBlock(int blockNum, byte readBlockData[]) 
+{ 
+  //----------------------------------------------------------------------------
+  /* Prepare the ksy for authentication */
+  /* All keys are set to FFFFFFFFFFFFh at chip delivery from the factory */
+  for (byte i = 0; i < 6; i++) {
+    key.keyByte[i] = 0xFF;
+  }
+  //----------------------------------------------------------------------------
+  /* Authenticating the desired data block for Read access using Key A */
+  status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockNum, &key, &(mfrc522.uid));
+  //----------------------------------------------------------------------------s
+  if (status != MFRC522::STATUS_OK){
+     Serial.print("Authentication failed for Read: ");
+     Serial.println(mfrc522.GetStatusCodeName(status));
+     return;
+  }
+  //----------------------------------------------------------------------------
+  else {
+    Serial.println("Authentication success");
+  }
+  //----------------------------------------------------------------------------
+  /* Reading data from the Block */
+  status = mfrc522.MIFARE_Read(blockNum, readBlockData, &bufferLen);
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print("Reading failed: ");
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+  //----------------------------------------------------------------------------
+  else {
+    readBlockData[16] = ' ';
+    readBlockData[17] = ' ';
+    Serial.println("Block was read successfully");  
+  }
+  //----------------------------------------------------------------------------
+}
